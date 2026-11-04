@@ -7,9 +7,11 @@ volumes, right from the little screen on your mouse dongle.
 > Unofficial community project. Not affiliated with or endorsed by WLMouse.
 > Flashing firmware always carries some risk: read [Safety](#safety) first.
 
+<!-- photos of the AUDIO and MIXER screens coming soon
 | AUDIO | MIXER |
 |---|---|
 | ![AUDIO screen](docs/screen-audio.jpg) | ![MIXER screen](docs/screen-mixer.jpg) |
+-->
 
 ## Features
 
