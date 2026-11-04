@@ -94,6 +94,7 @@ A_SONG, A_PILL, A_OUT, A_MICDISC, A_MIC, A_PP = 4, 5, 6, 11, 12, 15
 M_APP, M_ICON, M_DOT0, M_BAR, M_PCT = 4, 5, 6, 12, 13
 I_BATT = 18                       # en los dos modos: % de bateria
 MIC_X = 236
+MIX_HEADER_H = 30      # MEZCLADOR: toques con y < 30 son del titulo (volver / menu); debajo, flechas y volumen
 FONT11 = 0x080A36C8
 SLEEP_SITE = 0x08022578          # ldrb.w r0, [sp, #0x49] (flag "mouse dormido")
 
@@ -369,7 +370,7 @@ def build():
     A.b("ht_ret")
     # --- MEZCLADOR
     A.label("ht_mix")
-    A.cmp_i(6, 40)
+    A.cmp_i(6, MIX_HEADER_H)             # el titulo solo hasta y=30: la fila de flechas (y 38) queda entera abajo
     A.bcond("hs", "hm_lower")
     A.cmp_i(2, 40)
     A.bcond_w("hs", "tap_orig_r")

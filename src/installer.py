@@ -85,8 +85,13 @@ def status():
     if not lcd.open():
         return None, None
     try:
-        ver = flasher.app_version(lcd)
-        if ver is None and "B" in flasher.bl_version(lcd).upper():
+        ver = None
+        for _ in range(5):                  # a veces la primera lectura llega vacia (0.0.0.0)
+            ver = flasher.app_version(lcd)
+            if ver and ver != "0.0.0.0":
+                break
+            time.sleep(0.3)
+        if ver in (None, "0.0.0.0") and "B" in flasher.bl_version(lcd).upper():
             return "update-mode", None
         # el firmware oficial no conoce el comando 0x20 (responde A3); el nuestro responde A1
         code = lcd_command(lcd, CMD_MEDIA_INFO)
