@@ -1,7 +1,9 @@
-"""WL Dongle Media: instala la pantalla Media Control en el dongle y queda en la bandeja haciendo de puente.
+"""WL Dongle Media: instala la pantalla Media Control en el dongle y queda en segundo plano haciendo de puente.
 
     python app.py               # abre la ventana
-    python app.py --background  # arranca oculto en la bandeja (asi lo lanza Windows al iniciar)
+    python app.py --background  # arranca oculto, sin ventana ni icono (asi lo lanza Windows al iniciar)
+
+No usa icono en la bandeja: si ya esta corriendo, abrirlo de nuevo muestra la ventana de la instancia que corre.
 """
 import ctypes
 import subprocess
@@ -12,7 +14,6 @@ import tkinter as tk
 import winreg
 from tkinter import messagebox, ttk
 
-import pystray
 from PIL import Image, ImageDraw, ImageFont
 
 import dongle_media
@@ -24,9 +25,29 @@ ACCENT = "#4f8cff"
 
 
 # ------------------------------------------------------------------ utilidades
+SHOW_EVENT = "WLDongleMediaShow"
+kernel32 = ctypes.windll.kernel32
+kernel32.CreateEventW.restype = ctypes.c_void_p
+kernel32.OpenEventW.restype = ctypes.c_void_p
+kernel32.WaitForSingleObject.argtypes = (ctypes.c_void_p, ctypes.c_uint32)
+kernel32.SetEvent.argtypes = (ctypes.c_void_p,)
+kernel32.CloseHandle.argtypes = (ctypes.c_void_p,)
+
+
 def single_instance():
-    ctypes.windll.kernel32.CreateMutexW(None, False, "WLDongleMediaMutex")
-    return ctypes.windll.kernel32.GetLastError() != 183  # ERROR_ALREADY_EXISTS
+    kernel32.CreateMutexW(None, False, "WLDongleMediaMutex")
+    return kernel32.GetLastError() != 183  # ERROR_ALREADY_EXISTS
+
+
+def ask_running_instance_to_show():
+    """La instancia que ya corre espera este evento y muestra su ventana."""
+    h = kernel32.OpenEventW(0x0002, False, SHOW_EVENT)  # EVENT_MODIFY_STATE
+    if not h:
+        return False
+    ctypes.windll.user32.AllowSetForegroundWindow(-1)  # ASFW_ANY: que pueda pasar al frente
+    kernel32.SetEvent(h)
+    kernel32.CloseHandle(h)
+    return True
 
 
 def launch_command():
@@ -91,13 +112,8 @@ class App:
         self.root.iconphoto(True, ImageTk.PhotoImage(self._icon_img))
         self.build()
 
-        self.tray = pystray.Icon(APP, make_icon(64), APP, menu=pystray.Menu(
-            pystray.MenuItem("Open", lambda: self.root.after(0, self.show), default=True),
-            pystray.MenuItem("Start with Windows", lambda: set_autostart(not autostart_enabled()),
-                             checked=lambda _: autostart_enabled()),
-            pystray.MenuItem("Quit", lambda: self.root.after(0, self.quit)),
-        ))
-        self.tray.run_detached()
+        show_event = kernel32.CreateEventW(None, False, False, SHOW_EVENT)  # auto-reset
+        threading.Thread(target=self._wait_show, args=(show_event,), daemon=True).start()
 
         if background:
             self.root.withdraw()
@@ -124,10 +140,15 @@ class App:
         self.log = ttk.Label(f, text="", foreground="#666", wraplength=380, justify="left")
         self.log.grid(sticky="w")
         self.auto = tk.BooleanVar(value=autostart_enabled())
-        ttk.Checkbutton(f, text="Start with Windows (runs in the tray)", variable=self.auto,
+        ttk.Checkbutton(f, text="Start with Windows (runs in the background, no tray icon)", variable=self.auto,
                         command=lambda: set_autostart(self.auto.get())).grid(sticky="w", pady=(12, 0))
-        ttk.Label(f, text="Closing this window keeps it running in the tray.",
-                  foreground="#666").grid(sticky="w")
+        bottom = ttk.Frame(f)
+        bottom.grid(sticky="we", pady=(6, 0))
+        bottom.columnconfigure(0, weight=1)
+        ttk.Label(bottom, text="Closing this window keeps it running in the background.\n"
+                               "Open WL Dongle Media again to bring this window back.",
+                  foreground="#666", justify="left").grid(row=0, column=0, sticky="w")
+        ttk.Button(bottom, text="Quit", command=self.quit).grid(row=0, column=1, sticky="e")
 
     # --- estado
     def refresh(self):
@@ -154,7 +175,7 @@ class App:
         elif kind == "oficial":
             text = f"Official firmware {ver}. Media Control is not installed yet."
         else:
-            text = f"Media Control is installed (firmware {ver}). Everything runs from the tray."
+            text = f"Media Control is installed (firmware {ver}). It keeps running in the background."
         self.status.config(text=text)
         self.btn_install.config(text="Reinstall" if kind == "media-control" else "Install Media Control",
                                 state="normal" if kind else "disabled")
@@ -209,16 +230,22 @@ class App:
                 self.auto.set(True)
             messagebox.showinfo(APP, "Done! The official screen firmware is back." if restore else
                                 "Done! Media Control is now the default screen.\n"
-                                "Keep this program running (it lives in the tray) for the buttons to work.")
+                                "Keep this program running (it stays in the background) for the buttons to work.")
         else:
             messagebox.showerror(APP, f"Something went wrong:\n\n{err}\n\nIf the screen stays blank, run the "
                                       "install again (or use the official WLMouse web driver).")
         self.refresh()
 
-    # --- ventana / bandeja
+    # --- ventana
+    def _wait_show(self, event):
+        while True:
+            if kernel32.WaitForSingleObject(event, 0xFFFFFFFF) == 0:  # INFINITE / WAIT_OBJECT_0
+                self.root.after(0, self.show)
+
     def show(self):
         self.root.deiconify()
         self.root.lift()
+        self.root.focus_force()
         self.refresh()
 
     def hide(self):
@@ -231,7 +258,6 @@ class App:
         if self.busy:
             messagebox.showwarning(APP, "Wait until the install finishes.")
             return
-        self.tray.stop()
         self.root.destroy()
 
     def run(self):
@@ -243,7 +269,8 @@ def main():
         make_icon(256).save(sys.argv[sys.argv.index("--write-icon") + 1], sizes=[(16, 16), (32, 32), (48, 48), (256, 256)])
         return
     if not single_instance():
-        ctypes.windll.user32.MessageBoxW(None, f"{APP} is already running (look in the tray).", APP, 0x40)
+        if not ask_running_instance_to_show():
+            ctypes.windll.user32.MessageBoxW(None, f"{APP} is already running.", APP, 0x40)
         return
     App(background="--background" in sys.argv).run()
 

@@ -35,7 +35,8 @@ volumes, right from the little screen on your mouse dongle.
 - Double-tap (if *Double Touch Link* is on) plays/pauses instead of opening the WLMouse website.
 
 The screens live on the dongle itself. The buttons and live info (song, outputs, apps, mic) come
-from the small **WL Dongle Media** app, which runs in the system tray.
+from the small **WL Dongle Media** app, which runs quietly in the background (no tray icon:
+open the app again to see its window, or press **Quit** there to stop it).
 
 ![WL Dongle Media app](docs/app-window.png)
 
@@ -52,7 +53,7 @@ from the small **WL Dongle Media** app, which runs in the system tray.
 2. Run it. Windows SmartScreen may say *"Windows protected your PC"* because the exe isn't code-signed:
    click **More info → Run anyway** (or [run it from source](#run-from-source)).
 3. Click **Install Media Control** and wait. It takes **10-20 minutes**; don't unplug the dongle.
-4. Done. Media Control is now the default screen, and the app starts with Windows in the tray.
+4. Done. Media Control is now the default screen, and the app starts with Windows in the background.
 
 To go back to stock, open the app and click **Restore official firmware**.
 
@@ -109,7 +110,7 @@ rebuild it you need the official hex in `backup-original/` (not included); see
 
 ## Limitations
 
-- Windows only for now (the dongle part is OS-independent; the tray app uses Windows audio APIs).
+- Windows only for now (the dongle part is OS-independent; the PC app uses Windows audio APIs).
 - Song name and play state come from Spotify only.
 - Only receiver firmware 0.0.15.0 is supported. If WLMouse ships a new firmware, the installer
   refuses to patch it until the patch is updated.
