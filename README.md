@@ -83,9 +83,6 @@ To go back to stock, open the app and click **Restore official firmware**.
   ```
   certutil -hashfile WLDongleMedia.exe SHA256
   ```
-- **VirusTotal:** the scan link is in each release's notes. Executables packed with PyInstaller
-  sometimes get a few generic false positives from small antivirus engines; the attestation above is
-  the stronger proof of what's inside.
 
 ## Run from source
 
