@@ -1,0 +1,49 @@
+# Builds WLDongleMedia.exe from the tagged source on GitHub's own runners, publishes it with its
+# SHA-256 and a signed build-provenance attestation (verify with `gh attestation verify`).
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller==6.16.0
+
+      - name: Build
+        run: |
+          python src/app.py --write-icon app.ico
+          pyinstaller --noconfirm --onefile --windowed --noupx --name WLDongleMedia --icon app.ico `
+            --add-data "src/patch_v6.json;." --add-data "src/font18.json;." --paths src src/app.py
+
+      - name: Checksums
+        shell: pwsh
+        run: |
+          $h = (Get-FileHash dist/WLDongleMedia.exe -Algorithm SHA256).Hash.ToLower()
+          "$h  WLDongleMedia.exe" | Out-File dist/SHA256SUMS.txt -Encoding ascii
+          Get-Content dist/SHA256SUMS.txt
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/WLDongleMedia.exe
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/WLDongleMedia.exe
+            dist/SHA256SUMS.txt
+          generate_release_notes: true
