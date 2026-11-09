@@ -26,6 +26,7 @@ import pathlib
 import struct
 import sys
 import time
+import traceback
 
 import hid
 
@@ -266,6 +267,8 @@ def listen(active=lambda: True):
                             last_block = None  # la pantalla todavia no esta lista: reintentar
         except OSError:
             log("dongle desconectado, reintentando")
+        except Exception:  # noqa: BLE001 - un error raro (audio, COM...) no tiene que matar el puente
+            log("error en el puente, reintentando:\n" + traceback.format_exc())
         finally:
             dev.close()
         time.sleep(2)

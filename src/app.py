@@ -5,19 +5,44 @@
 
 No usa icono en la bandeja: si ya esta corriendo, abrirlo de nuevo muestra la ventana de la instancia que corre.
 """
+import atexit
 import ctypes
+import os
+import pathlib
 import subprocess
 import sys
 import threading
 import time
 import tkinter as tk
+import traceback
 import winreg
 from tkinter import messagebox, ttk
 
-from PIL import Image, ImageDraw, ImageFont
 
-import dongle_media
-import installer
+def setup_log():
+    """Sin consola (pythonw / exe --windowed) stdout y stderr son None: todo va a
+    %LOCALAPPDATA%\\WLDongleMedia\\app.log, asi queda registrado si algo falla o se cierra."""
+    if sys.stdout is not None and sys.stderr is not None:
+        return None
+    path = pathlib.Path(os.environ.get("LOCALAPPDATA", ".")) / "WLDongleMedia" / "app.log"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists() and path.stat().st_size > 1_000_000:
+        path.replace(path.with_suffix(".old.log"))
+    f = open(path, "a", encoding="utf-8", buffering=1)
+    sys.stdout = sys.stderr = f
+    threading.excepthook = lambda a: print(time.strftime("%Y-%m-%d %H:%M:%S"), f"thread {a.thread.name} crashed:\n" +
+                                           "".join(traceback.format_exception(a.exc_type, a.exc_value, a.exc_traceback)))
+    print(time.strftime("%Y-%m-%d %H:%M:%S"), "start", sys.argv[1:], f"pid {os.getpid()}")
+    atexit.register(lambda: print(time.strftime("%Y-%m-%d %H:%M:%S"), "exit"))
+    return path
+
+
+LOG_PATH = setup_log()
+
+from PIL import Image, ImageDraw, ImageFont  # noqa: E402
+
+import dongle_media  # noqa: E402
+import installer  # noqa: E402
 
 APP = "WL Dongle Media"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
